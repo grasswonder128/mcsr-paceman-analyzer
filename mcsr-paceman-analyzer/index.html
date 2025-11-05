@@ -123,6 +123,12 @@
             border-left: 4px solid var(--info-color);
         }
         
+        .warning {
+            background: #fff3cd;
+            color: #856404;
+            border-left: 4px solid #ffc107;
+        }
+        
         .stats {
             background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
             padding: 25px;
@@ -575,6 +581,7 @@
         <div id="content" class="hidden">
             <div class="tabs">
                 <div class="tab active" data-tab="overview">概览</div>
+                <div class="tab" data-tab="behavior">行为分析</div>
                 <div class="tab" data-tab="comparison">玩家对比</div>
             </div>
             
@@ -604,6 +611,25 @@
                     <h2>时间趋势</h2>
                     <div class="chart-wrapper">
                         <canvas id="trendChart" class="chart-canvas"></canvas>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="tab-content" id="behavior-tab">
+                <div class="chart-container">
+                    <h2>玩家行为分析报告</h2>
+                    <div class="search-box">
+                        <input type="text" id="behaviorPlayerName" placeholder="输入玩家名称进行深度分析">
+                        <button id="analyzeButton" onclick="loadBehaviorAnalysis()">深度分析</button>
+                    </div>
+                    
+                    <div id="behaviorLoading" class="loading hidden">
+                        <div class="spinner"></div>
+                        <p>正在分析玩家行为模式...</p>
+                    </div>
+                    
+                    <div id="behaviorContent" class="hidden">
+                        <!-- 行为分析内容将通过JavaScript动态生成 -->
                     </div>
                 </div>
             </div>
@@ -986,7 +1012,6 @@
             paginationDiv.innerHTML = paginationHTML;
         }
         
-        
         function changePage(page) {
             currentPage = page;
             displayRunList();
@@ -1208,7 +1233,7 @@
             }
         }
         
-        // 计算分段独立时间（当前分段时间减去上一个分段时间）
+        // 计算分段独立时间
         function calculateSegmentDurations(playerData) {
             const segments = [
                 { key: 'nether', name: 'ow-下界' },
@@ -1308,7 +1333,6 @@
                 maxTime = Math.max(maxTime, item.duration);
             });
             
-            // 确保maxTime至少为1，避免除0错误
             maxTime = Math.max(maxTime, 1);
             
             // 绘制网格背景
@@ -1350,7 +1374,7 @@
                 ctx.stroke();
             }
             
-            // 绘制玩家1的折线 - 使用分段独立时间
+            // 绘制玩家1的折线
             ctx.strokeStyle = playerColors.player1;
             ctx.lineWidth = 3;
             ctx.beginPath();
@@ -1393,7 +1417,7 @@
                 ctx.fillText(formatTime(item.duration * 60 * 1000), x, y - 8);
             });
             
-            // 绘制玩家2的折线 - 使用分段独立时间
+            // 绘制玩家2的折线
             ctx.strokeStyle = playerColors.player2;
             ctx.lineWidth = 3;
             ctx.beginPath();
@@ -1452,6 +1476,237 @@
             ctx.fillText(message, width/2, height/2);
         }
         
+        // 加载行为分析数据
+        async function loadBehaviorAnalysis() {
+            const playerName = document.getElementById('behaviorPlayerName').value.trim();
+            if (!playerName) {
+                showMessage('请输入玩家名称进行行为分析', 'error');
+                return;
+            }
+
+            const behaviorLoading = document.getElementById('behaviorLoading');
+            const behaviorContent = document.getElementById('behaviorContent');
+            
+            behaviorLoading.classList.remove('hidden');
+            behaviorContent.classList.add('hidden');
+            showMessage('正在分析玩家行为模式...', 'info');
+
+            try {
+                const response = await fetch(`${API_BASE}/getBehaviorAnalysis?name=${playerName}`);
+                if (!response.ok) {
+                    throw new Error(`获取行为分析数据失败: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                
+                if (!data.success) {
+                    throw new Error(data.message || '行为分析失败');
+                }
+
+                displayBehaviorAnalysis(data.analysis, playerName);
+                behaviorContent.classList.remove('hidden');
+                showMessage(`成功分析玩家 "${playerName}" 的行为模式`, 'success');
+                
+            } catch (error) {
+                console.error('行为分析错误:', error);
+                showMessage(`行为分析失败: ${error.message}`, 'error');
+                behaviorContent.innerHTML = `<div class="message error">分析失败: ${error.message}</div>`;
+                behaviorContent.classList.remove('hidden');
+            } finally {
+                behaviorLoading.classList.add('hidden');
+            }
+        }
+
+        // 显示行为分析结果
+        function displayBehaviorAnalysis(analysis, playerName) {
+            const behaviorContent = document.getElementById('behaviorContent');
+            
+            const html = `
+                <div class="stats">
+                    <h2>玩家行为画像: ${playerName}</h2>
+                    
+                    <!-- 个人基准线 -->
+                    <div class="chart-container">
+                        <h3>个人基准线分析</h3>
+                        <div class="stat-grid">
+                            <div class="stat-item">
+                                <div class="stat-value">${analysis.personalBaseline.p50}</div>
+                                <div class="stat-label">正常水平 (p50)</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-value">${analysis.personalBaseline.p25}</div>
+                                <div class="stat-label">较好表现 (p25)</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-value">${analysis.personalBaseline.p75}</div>
+                                <div class="stat-label">状态不佳 (p75)</div>
+                            </div>
+                        </div>
+                        <div class="info message">
+                            基于 ${analysis.personalBaseline.basedOnRuns} 次完成记录计算
+                        </div>
+                    </div>
+                    
+                    <!-- 重置模式分析 -->
+                    <div class="chart-container">
+                        <h3>重置模式分析</h3>
+                        <div class="segment-stats">
+                            <div class="segment-item">
+                                <div class="segment-name">早期重置 (前3分钟)</div>
+                                <div class="segment-value">${analysis.resetPatterns.earlyResets} 次</div>
+                            </div>
+                            <div class="segment-item">
+                                <div class="segment-name">中期重置 (3-10分钟)</div>
+                                <div class="segment-value">${analysis.resetPatterns.midResets} 次</div>
+                            </div>
+                            <div class="segment-item">
+                                <div class="segment-name">晚期重置 (10分钟后)</div>
+                                <div class="segment-value">${analysis.resetPatterns.lateResets} 次</div>
+                            </div>
+                            <div class="segment-item">
+                                <div class="segment-name">重置策略</div>
+                                <div class="segment-value">${analysis.resetPatterns.resetStrategy}</div>
+                            </div>
+                        </div>
+                        <div class="info message">
+                            你的重置策略较为${analysis.resetPatterns.resetStrategy}
+                        </div>
+                    </div>
+                    
+                    <!-- 进步趋势 -->
+                    <div class="chart-container">
+                        <h3>学习进步分析</h3>
+                        <div class="completion-stats">
+                            <div class="completion-stat">
+                                <div class="completion-value">${(analysis.learningMetrics.learningRate * 100).toFixed(1)}%</div>
+                                <div class="completion-label">学习速率</div>
+                            </div>
+                            <div class="completion-stat">
+                                <div class="completion-value">${(analysis.progressionStability.overallConsistency * 100).toFixed(1)}%</div>
+                                <div class="completion-label">表现一致性</div>
+                            </div>
+                        </div>
+                        <div class="time-stats">
+                            <div class="time-stat">
+                                <div class="time-stat-value">${getImprovementTrendDisplayName(analysis.learningMetrics.improvementTrend)}</div>
+                                <div class="time-stat-label">进步趋势</div>
+                            </div>
+                            <div class="time-stat">
+                                <div class="time-stat-value">${analysis.progressionStability.streakInfo.currentStreak}</div>
+                                <div class="time-stat-label">当前连续完成</div>
+                            </div>
+                            <div class="time-stat">
+                                <div class="time-stat-value">${analysis.progressionStability.streakInfo.bestStreak}</div>
+                                <div class="time-stat-label">最佳连续完成</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 运气影响评估 -->
+                    <div class="chart-container">
+                        <h3>运气影响评估</h3>
+                        <div class="segment-stats">
+                            <div class="segment-item">
+                                <div class="segment-name">运气依赖度</div>
+                                <div class="segment-value">${(analysis.luckAssessment.luckDependency * 100).toFixed(1)}%</div>
+                            </div>
+                            <div class="segment-item">
+                                <div class="segment-name">表现波动范围</div>
+                                <div class="segment-value">${(analysis.luckAssessment.performanceSpread * 100).toFixed(1)}%</div>
+                            </div>
+                            <div class="segment-item">
+                                <div class="segment-name">异常表现频率</div>
+                                <div class="segment-value">${(analysis.luckAssessment.outlierFrequency * 100).toFixed(1)}%</div>
+                            </div>
+                        </div>
+                        <div class="info message">
+                            ${analysis.luckAssessment.luckDependency > 0.7 ? 
+                            '你的表现受种子运气影响较大' : 
+                            '你的表现相对稳定，受运气影响较小'}
+                        </div>
+                    </div>
+                    
+                    <!-- 玩家状态和总结 -->
+                    <div class="chart-container">
+                        <h3>综合分析总结</h3>
+                        <div class="completion-stats">
+                            <div class="completion-stat">
+                                <div class="completion-value" style="color: ${
+                                    analysis.playerState.state === 'rapid_improvement' ? '#27ae60' :
+                                    analysis.playerState.state === 'stable_expert' ? '#3498db' :
+                                    analysis.playerState.state === 'declining' ? '#e74c3c' :
+                                    analysis.playerState.state === 'inefficient_resets' ? '#f39c12' :
+                                    analysis.playerState.state === 'plateau' ? '#9b59b6' : '#95a5a6'
+                                }">
+                                    ${getStateDisplayName(analysis.playerState.state)}
+                                </div>
+                                <div class="completion-label">当前状态</div>
+                            </div>
+                            <div class="completion-stat">
+                                <div class="completion-value">${(analysis.playerState.confidence * 100).toFixed(0)}%</div>
+                                <div class="completion-label">分析置信度</div>
+                            </div>
+                        </div>
+                        <div class="success message">
+                            ${analysis.summary}
+                        </div>
+                    </div>
+                    
+                    <!-- 分段稳定性详情 -->
+                    <div class="chart-container">
+                        <h3>分段稳定性详情</h3>
+                        <div class="segment-stats">
+                            ${Object.entries(analysis.progressionStability.segmentConsistency || {}).map(([segment, consistency]) => `
+                                <div class="segment-item">
+                                    <div class="segment-name">${getSegmentDisplayName(segment)}</div>
+                                    <div class="segment-value">${(consistency * 100).toFixed(1)}%</div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            behaviorContent.innerHTML = html;
+        }
+        // 获取状态显示名称
+        function getStateDisplayName(state) {
+            const stateNames = {
+                'rapid_improvement': '快速进步',
+                'stable_expert': '稳定专家',
+                'declining': '状态下滑',
+                'inefficient_resets': '重置低效',
+                'plateau': '瓶颈期',
+                'developing': '稳步发展'
+            };
+            return stateNames[state] || state;
+        }
+
+        // 获取进步趋势显示名称
+        function getImprovementTrendDisplayName(trend) {
+            const trendNames = {
+                'improving': '进步中',
+                'stable': '稳定',
+                'declining': '下滑',
+                'plateau': '瓶颈期',
+                'insufficient_data': '数据不足'
+            };
+            return trendNames[trend] || trend;
+        }
+
+        // 获取分段显示名称
+        function getSegmentDisplayName(segment) {
+            const segmentNames = {
+                'nether': '进入下界',
+                'bastion': '找到堡垒',
+                'fortress': '进入要塞',
+                'first_portal': '盲传',
+                'stronghold': '找到要塞',
+                'end': '进入末地'
+            };
+            return segmentNames[segment] || segment;
+        }
+        
         // 标签切换功能
         function initTabs() {
             const tabs = document.querySelectorAll('.tab');
@@ -1474,6 +1729,12 @@
             document.getElementById('playerName').addEventListener('keypress', function(e) {
                 if (e.key === 'Enter') {
                     loadData();
+                }
+            });
+            
+            document.getElementById('behaviorPlayerName').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    loadBehaviorAnalysis();
                 }
             });
             
