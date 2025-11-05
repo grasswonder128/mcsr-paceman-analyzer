@@ -1,0 +1,23 @@
+{
+
+  "name": "minecraft-pace-analyzer",
+  "version": "1.0.0",
+  "description": "mcsr_paceman-api服务器",
+  "main": "paceman_server.js",
+  "scripts": {
+    "start": "node paceman_server.js",
+    "dev": "nodemon paceman_server.js"
+  },
+  "keywords": [],
+  "author": "grasswonder_128",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "express": "^4.18.2",
+    "axios": "^1.6.0",
+    "cors": "^2.8.5"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  }
+}
